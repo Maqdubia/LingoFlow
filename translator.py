@@ -5,7 +5,17 @@ LANGUAGES = {
     "en": "English",
     "hi": "Hindi",
     "te": "Telugu",
-    "ta": "Tamil"
+    "ta": "Tamil",
+    "es": "Spanish",
+    "fr": "French",
+    "de": "German",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "ar": "Arabic",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "zh-CN": "Chinese",
+    "nl": "Dutch"
 }
 
 
@@ -44,7 +54,6 @@ def translate_text(text, target_code):
             )
 
         translated_text = data["responseData"]["translatedText"]
-
         return translated_text
 
     except requests.exceptions.RequestException as error:
@@ -52,38 +61,37 @@ def translate_text(text, target_code):
 
 
 def multilingual_translator():
-
     print("\n====================================")
     print("       MULTILINGUAL TRANSLATOR")
     print("====================================")
 
-    language_options = {
-        "1": ("English", "en"),
-        "2": ("Hindi", "hi"),
-        "3": ("Telugu", "te"),
-        "4": ("Tamil", "ta")
-    }
+    language_codes = list(LANGUAGES.items())
 
     while True:
-
         print("\nSelect your target language:")
-        print("1. English")
-        print("2. Hindi")
-        print("3. Telugu")
-        print("4. Tamil")
-        print("5. Exit")
 
-        choice = input("\nEnter your choice (1-5): ")
+        for index, (code, name) in enumerate(language_codes, start=1):
+            print(f"{index}. {name}")
 
-        if choice == "5":
+        print(f"{len(language_codes) + 1}. Exit")
+
+        choice = input("\nEnter your choice: ").strip()
+
+        if choice == str(len(language_codes) + 1):
             print("\nTranslator closed!")
             break
 
-        if choice not in language_options:
+        if not choice.isdigit():
             print("\nInvalid choice. Try again.")
             continue
 
-        language_name, target_code = language_options[choice]
+        selected = int(choice) - 1
+
+        if selected < 0 or selected >= len(language_codes):
+            print("\nInvalid choice. Try again.")
+            continue
+
+        target_code, language_name = language_codes[selected]
 
         text = input("\nEnter the sentence to translate: ").strip()
 
