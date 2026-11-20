@@ -8,9 +8,9 @@ const targetLanguage = document.getElementById("targetLanguage");
 const translateButton = document.getElementById("translateButton");
 const swapButton = document.getElementById("swapButton");
 const clearButton = document.getElementById("clearButton");
+const clearActionButton = document.getElementById("clearActionButton");
 const copyButton = document.getElementById("copyButton");
 const micButton = document.getElementById("micButton");
-
 
 const characterCount = document.getElementById("characterCount");
 const outputLanguage = document.getElementById("outputLanguage");
@@ -20,19 +20,38 @@ const languageNames = {
     en: "English",
     hi: "Hindi",
     te: "Telugu",
-    ta: "Tamil"
+    ta: "Tamil",
+    es: "Spanish",
+    fr: "French",
+    de: "German",
+    it: "Italian",
+    pt: "Portuguese",
+    ar: "Arabic",
+    ja: "Japanese",
+    ko: "Korean",
+    "zh-CN": "Chinese",
+    nl: "Dutch"
 };
 
 const speechLocales = {
     en: "en-US",
     hi: "hi-IN",
     te: "te-IN",
-    ta: "ta-IN"
+    ta: "ta-IN",
+    es: "es-ES",
+    fr: "fr-FR",
+    de: "de-DE",
+    it: "it-IT",
+    pt: "pt-PT",
+    ar: "ar-SA",
+    ja: "ja-JP",
+    ko: "ko-KR",
+    "zh-CN": "zh-CN",
+    nl: "nl-NL"
 };
 
 let recognition = null;
 let isListening = false;
-let recognitionTimer = null;
 
 function showStatus(message, type = "") {
     statusMessage.textContent = message;
@@ -52,25 +71,18 @@ function updateOutputLanguage() {
         languageNames[targetLanguage.value] || "Translation";
 }
 
-function resetMicButton() {
-    isListening = false;
-    micButton.innerHTML = "<span>🎙</span> Speak";
-
-    if (recognitionTimer) {
-        clearTimeout(recognitionTimer);
-        recognitionTimer = null;
-    }
+function clearTranslation() {
+    inputText.value = "";
+    outputText.textContent = "Your translation will appear here...";
+    updateCharacterCount();
+    showStatus("");
 }
 
 inputText.addEventListener("input", updateCharacterCount);
 targetLanguage.addEventListener("change", updateOutputLanguage);
 
-clearButton.addEventListener("click", () => {
-    inputText.value = "";
-    outputText.textContent = "Your translation will appear here...";
-    updateCharacterCount();
-    showStatus("");
-});
+clearButton.addEventListener("click", clearTranslation);
+clearActionButton.addEventListener("click", clearTranslation);
 
 swapButton.addEventListener("click", () => {
     const source = sourceLanguage.value;
@@ -78,7 +90,7 @@ swapButton.addEventListener("click", () => {
 
     if (source === "auto") {
         showStatus(
-            "Translate first before swapping detected languages.",
+            "Choose a source language before swapping.",
             "error"
         );
         return;
@@ -87,11 +99,11 @@ swapButton.addEventListener("click", () => {
     sourceLanguage.value = target;
     targetLanguage.value = source;
 
-    const translated = outputText.textContent;
+    const translated = outputText.textContent.trim();
 
     if (
-        translated !== "Your translation will appear here..." &&
-        translated.trim()
+        translated &&
+        translated !== "Your translation will appear here..."
     ) {
         inputText.value = translated;
         outputText.textContent = "Your translation will appear here...";
@@ -103,7 +115,7 @@ swapButton.addEventListener("click", () => {
 });
 
 copyButton.addEventListener("click", async () => {
-    const translated = outputText.textContent;
+    const translated = outputText.textContent.trim();
 
     if (
         !translated ||
@@ -137,7 +149,7 @@ translateButton.addEventListener("click", async () => {
     }
 
     translateButton.disabled = true;
-    translateButton.textContent = "Translating...";
+    translateButton.innerHTML = "Translating...";
 
     showStatus("Translating your text...");
 
@@ -165,20 +177,27 @@ translateButton.addEventListener("click", async () => {
         showStatus("Translation completed successfully.", "success");
 
     } catch (error) {
-        showStatus(error.message || "Something went wrong.", "error");
-
+        showStatus(
+            error.message || "Something went wrong. Please try again.",
+            "error"
+        );
     } finally {
         translateButton.disabled = false;
         translateButton.innerHTML = 'Translate <span>→</span>';
     }
 });
 
-// SPEECH RECOGNITION
+// VOICE INPUT
 
 function getSpeechRecognition() {
     return window.SpeechRecognition ||
         window.webkitSpeechRecognition ||
         null;
+}
+
+function resetMicButton() {
+    isListening = false;
+    micButton.innerHTML = "<span>🎙</span> Speak";
 }
 
 function startSpeechRecognition() {
@@ -192,19 +211,8 @@ function startSpeechRecognition() {
         return;
     }
 
-    if (!navigator.mediaDevices ||
-        !navigator.mediaDevices.getUserMedia) {
-        showStatus(
-            "Microphone access is unavailable in this browser.",
-            "error"
-        );
-        return;
-    }
-
-    if (isListening) {
-        if (recognition) {
-            recognition.stop();
-        }
+    if (isListening && recognition) {
+        recognition.stop();
         return;
     }
 
@@ -215,21 +223,16 @@ function startSpeechRecognition() {
         recognition.interimResults = true;
         recognition.maxAlternatives = 1;
 
-        recognition.lang =
-            sourceLanguage.value === "auto"
-                ? "en-US"
-                : speechLocales[sourceLanguage.value] || "en-US";
+        const selectedLanguage = sourceLanguage.value;
+
+        recognition.lang = selectedLanguage === "auto"
+            ? "en-US"
+            : (speechLocales[selectedLanguage] || "en-US");
 
         let finalTranscript = "";
 
         recognition.onstart = () => {
             isListening = true;
-
-            if (recognitionTimer) {
-                clearTimeout(recognitionTimer);
-                recognitionTimer = null;
-            }
-
             micButton.innerHTML = "<span>🎙</span> Listening...";
             showStatus("Listening. Speak now...");
         };
@@ -254,10 +257,6 @@ function startSpeechRecognition() {
                 inputText.value = currentTranscript;
                 updateCharacterCount();
             }
-
-            if (finalTranscript.trim()) {
-                showStatus("Speech converted to text.", "success");
-            }
         };
 
         recognition.onerror = (event) => {
@@ -267,15 +266,15 @@ function startSpeechRecognition() {
                 "service-not-allowed":
                     "The browser speech recognition service is blocked.",
                 "no-speech":
-                    "No speech detected. Please try speaking again.",
+                    "No speech detected. Please try again.",
                 "network":
-                    "Speech recognition network error. Check your internet connection.",
+                    "Speech recognition network error. Check your internet.",
                 "audio-capture":
                     "Unable to capture microphone audio. Check your microphone.",
                 "aborted":
                     "Voice recognition was stopped.",
                 "language-not-supported":
-                    "This language is not supported by your browser."
+                    "This language is not supported for voice input in your browser."
             };
 
             showStatus(
@@ -298,41 +297,18 @@ function startSpeechRecognition() {
         };
 
         showStatus("Starting microphone...");
-
-        // Detect browsers where the recognition service
-        // accepts the command but never starts listening.
-        recognitionTimer = setTimeout(() => {
-            if (!isListening) {
-                showStatus(
-                    "Your browser did not start voice recognition. Please try Google Chrome.",
-                    "error"
-                );
-
-                try {
-                    recognition.abort();
-                } catch (error) {
-                    // Recognition may already have stopped.
-                }
-
-                resetMicButton();
-            }
-        }, 8000);
-
         recognition.start();
 
     } catch (error) {
         resetMicButton();
-
         showStatus(
-            "Unable to start voice recognition. Please try again in Chrome.",
+            "Unable to start voice recognition. Please try again.",
             "error"
         );
     }
 }
 
 micButton.addEventListener("click", startSpeechRecognition);
-
-
 
 // INITIALIZE
 
