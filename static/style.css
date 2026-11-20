@@ -595,6 +595,16 @@ textarea::placeholder { color: #B5ADC5; }
 
 @media (max-width: 380px) {
     .language-bar { gap: 6px; }
+    /* Keep only the Clear button inside the input box */
+#clearActionButton {
+    display: none;
+}
+
+@media (max-width: 650px) {
+    .input-actions {
+        grid-template-columns: 1fr;
+    }
+}
     .language-select select { font-size: 12px; }
     .swap-button { width: 32px; }
     .hero h1 { font-size: 36px; }
