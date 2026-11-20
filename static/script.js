@@ -10,7 +10,7 @@ const swapButton = document.getElementById("swapButton");
 const clearButton = document.getElementById("clearButton");
 const copyButton = document.getElementById("copyButton");
 const micButton = document.getElementById("micButton");
-const listenButton = document.getElementById("listenButton");
+
 
 const characterCount = document.getElementById("characterCount");
 const outputLanguage = document.getElementById("outputLanguage");
@@ -332,49 +332,7 @@ function startSpeechRecognition() {
 
 micButton.addEventListener("click", startSpeechRecognition);
 
-// TEXT TO SPEECH
 
-listenButton.addEventListener("click", () => {
-    const translated = outputText.textContent.trim();
-
-    if (
-        !translated ||
-        translated === "Your translation will appear here..."
-    ) {
-        showStatus("Translate something before listening.", "error");
-        return;
-    }
-
-    if (!("speechSynthesis" in window)) {
-        showStatus(
-            "Audio playback is not supported by this browser.",
-            "error"
-        );
-        return;
-    }
-
-    window.speechSynthesis.cancel();
-
-    const utterance = new SpeechSynthesisUtterance(translated);
-
-    utterance.lang = speechLocales[targetLanguage.value] || "en-US";
-    utterance.rate = 0.9;
-    utterance.pitch = 1;
-
-    utterance.onstart = () => {
-        showStatus("Playing translated audio...");
-    };
-
-    utterance.onend = () => {
-        showStatus("Audio playback completed.", "success");
-    };
-
-    utterance.onerror = () => {
-        showStatus("Unable to play translated audio.", "error");
-    };
-
-    window.speechSynthesis.speak(utterance);
-});
 
 // INITIALIZE
 
