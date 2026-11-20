@@ -32,7 +32,7 @@ const speechLocales = {
 
 let recognition = null;
 let isListening = false;
-
+let recognitionTimer = null;
 
 function showStatus(message, type = "") {
     statusMessage.textContent = message;
@@ -43,22 +43,27 @@ function showStatus(message, type = "") {
     }
 }
 
-
 function updateCharacterCount() {
     characterCount.textContent = `${inputText.value.length} / 5000`;
 }
-
 
 function updateOutputLanguage() {
     outputLanguage.textContent =
         languageNames[targetLanguage.value] || "Translation";
 }
 
+function resetMicButton() {
+    isListening = false;
+    micButton.innerHTML = "<span>🎙</span> Speak";
+
+    if (recognitionTimer) {
+        clearTimeout(recognitionTimer);
+        recognitionTimer = null;
+    }
+}
 
 inputText.addEventListener("input", updateCharacterCount);
-
 targetLanguage.addEventListener("change", updateOutputLanguage);
-
 
 clearButton.addEventListener("click", () => {
     inputText.value = "";
@@ -66,7 +71,6 @@ clearButton.addEventListener("click", () => {
     updateCharacterCount();
     showStatus("");
 });
-
 
 swapButton.addEventListener("click", () => {
     const source = sourceLanguage.value;
@@ -98,7 +102,6 @@ swapButton.addEventListener("click", () => {
     showStatus("Languages swapped.", "success");
 });
 
-
 copyButton.addEventListener("click", async () => {
     const translated = outputText.textContent;
 
@@ -117,7 +120,6 @@ copyButton.addEventListener("click", async () => {
         showStatus("Unable to copy. Check browser permissions.", "error");
     }
 });
-
 
 translateButton.addEventListener("click", async () => {
     const text = inputText.value.trim();
@@ -171,77 +173,166 @@ translateButton.addEventListener("click", async () => {
     }
 });
 
+// SPEECH RECOGNITION
 
-function initializeSpeechRecognition() {
-    const SpeechRecognition =
-        window.SpeechRecognition || window.webkitSpeechRecognition;
+function getSpeechRecognition() {
+    return window.SpeechRecognition ||
+        window.webkitSpeechRecognition ||
+        null;
+}
+
+function startSpeechRecognition() {
+    const SpeechRecognition = getSpeechRecognition();
 
     if (!SpeechRecognition) {
         showStatus(
-            "Speech recognition is not supported in this browser. Try Chrome.",
+            "Voice input is not supported in this browser. Please use Google Chrome.",
             "error"
         );
-        return false;
-    }
-
-    recognition = new SpeechRecognition();
-
-    recognition.continuous = false;
-    recognition.interimResults = false;
-
-    recognition.lang =
-        sourceLanguage.value === "auto"
-            ? "en-US"
-            : speechLocales[sourceLanguage.value];
-
-    recognition.onstart = () => {
-        isListening = true;
-        micButton.textContent = "Listening...";
-        showStatus("Listening. Speak now...");
-    };
-
-    recognition.onresult = (event) => {
-        const spokenText = event.results[0][0].transcript;
-
-        inputText.value = spokenText;
-        updateCharacterCount();
-
-        showStatus("Speech converted to text.", "success");
-    };
-
-    recognition.onerror = (event) => {
-        showStatus(
-            `Microphone error: ${event.error}. Check microphone permissions.`,
-            "error"
-        );
-    };
-
-    recognition.onend = () => {
-        isListening = false;
-        micButton.innerHTML = "<span>🎙</span> Speak";
-    };
-
-    return true;
-}
-
-
-micButton.addEventListener("click", () => {
-    if (isListening && recognition) {
-        recognition.stop();
         return;
     }
 
-    if (!initializeSpeechRecognition()) {
+    if (!navigator.mediaDevices ||
+        !navigator.mediaDevices.getUserMedia) {
+        showStatus(
+            "Microphone access is unavailable in this browser.",
+            "error"
+        );
+        return;
+    }
+
+    if (isListening) {
+        if (recognition) {
+            recognition.stop();
+        }
         return;
     }
 
     try {
-        recognition.start();
-    } catch (error) {
-        showStatus("Unable to start microphone. Try again.", "error");
-    }
-});
+        recognition = new SpeechRecognition();
 
+        recognition.continuous = false;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+
+        recognition.lang =
+            sourceLanguage.value === "auto"
+                ? "en-US"
+                : speechLocales[sourceLanguage.value] || "en-US";
+
+        let finalTranscript = "";
+
+        recognition.onstart = () => {
+            isListening = true;
+
+            if (recognitionTimer) {
+                clearTimeout(recognitionTimer);
+                recognitionTimer = null;
+            }
+
+            micButton.innerHTML = "<span>🎙</span> Listening...";
+            showStatus("Listening. Speak now...");
+        };
+
+        recognition.onresult = (event) => {
+            let interimTranscript = "";
+
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const transcript = event.results[i][0].transcript;
+
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+
+            const currentTranscript =
+                (finalTranscript + " " + interimTranscript).trim();
+
+            if (currentTranscript) {
+                inputText.value = currentTranscript;
+                updateCharacterCount();
+            }
+
+            if (finalTranscript.trim()) {
+                showStatus("Speech converted to text.", "success");
+            }
+        };
+
+        recognition.onerror = (event) => {
+            const errors = {
+                "not-allowed":
+                    "Microphone permission denied. Allow microphone access.",
+                "service-not-allowed":
+                    "The browser speech recognition service is blocked.",
+                "no-speech":
+                    "No speech detected. Please try speaking again.",
+                "network":
+                    "Speech recognition network error. Check your internet connection.",
+                "audio-capture":
+                    "Unable to capture microphone audio. Check your microphone.",
+                "aborted":
+                    "Voice recognition was stopped.",
+                "language-not-supported":
+                    "This language is not supported by your browser."
+            };
+
+            showStatus(
+                errors[event.error] ||
+                `Speech recognition error: ${event.error}`,
+                "error"
+            );
+
+            resetMicButton();
+        };
+
+        recognition.onend = () => {
+            resetMicButton();
+
+            if (finalTranscript.trim()) {
+                inputText.value = finalTranscript.trim();
+                updateCharacterCount();
+                showStatus("Speech converted to text.", "success");
+            }
+        };
+
+        showStatus("Starting microphone...");
+
+        // Detect browsers where the recognition service
+        // accepts the command but never starts listening.
+        recognitionTimer = setTimeout(() => {
+            if (!isListening) {
+                showStatus(
+                    "Your browser did not start voice recognition. Please try Google Chrome.",
+                    "error"
+                );
+
+                try {
+                    recognition.abort();
+                } catch (error) {
+                    // Recognition may already have stopped.
+                }
+
+                resetMicButton();
+            }
+        }, 8000);
+
+        recognition.start();
+
+    } catch (error) {
+        resetMicButton();
+
+        showStatus(
+            "Unable to start voice recognition. Please try again in Chrome.",
+            "error"
+        );
+    }
+}
+
+micButton.addEventListener("click", startSpeechRecognition);
+
+// TEXT TO SPEECH
 
 listenButton.addEventListener("click", () => {
     const translated = outputText.textContent.trim();
@@ -255,7 +346,10 @@ listenButton.addEventListener("click", () => {
     }
 
     if (!("speechSynthesis" in window)) {
-        showStatus("Audio playback is not supported by this browser.", "error");
+        showStatus(
+            "Audio playback is not supported by this browser.",
+            "error"
+        );
         return;
     }
 
@@ -282,6 +376,7 @@ listenButton.addEventListener("click", () => {
     window.speechSynthesis.speak(utterance);
 });
 
+// INITIALIZE
 
 updateCharacterCount();
 updateOutputLanguage();
