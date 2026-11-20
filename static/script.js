@@ -8,7 +8,6 @@ const targetLanguage = document.getElementById("targetLanguage");
 const translateButton = document.getElementById("translateButton");
 const swapButton = document.getElementById("swapButton");
 const clearButton = document.getElementById("clearButton");
-const clearActionButton = document.getElementById("clearActionButton");
 const copyButton = document.getElementById("copyButton");
 const micButton = document.getElementById("micButton");
 
@@ -82,7 +81,6 @@ inputText.addEventListener("input", updateCharacterCount);
 targetLanguage.addEventListener("change", updateOutputLanguage);
 
 clearButton.addEventListener("click", clearTranslation);
-clearActionButton.addEventListener("click", clearTranslation);
 
 swapButton.addEventListener("click", () => {
     const source = sourceLanguage.value;
