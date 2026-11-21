@@ -1,78 +1,78 @@
 
 import requests
 
-API_URL = "https://api.mymemory.translated.net/get"
-
-MYMEMORY_EMAIL = "maqdubiarahmath18@gmail.com"
-
 LANGUAGES = {
     "en": "English",
     "hi": "Hindi",
     "te": "Telugu",
-    "ta": "Tamil",
-    "ur": "Urdu",
-    "ar": "Arabic",
-    "fr": "French",
-    "es": "Spanish",
-    "de": "German",
-    "it": "Italian",
-    "pt": "Portuguese",
-    "ru": "Russian",
-    "ja": "Japanese",
-    "ko": "Korean",
-    "zh": "Chinese",
-    "bn": "Bengali",
-    "mr": "Marathi",
-    "gu": "Gujarati",
-    "pa": "Punjabi",
-    "ml": "Malayalam",
-    "kn": "Kannada"
+    "ta": "Tamil"
 }
 
+# Public LibreTranslate servers.
+# If one is unavailable, the next server is tried.
+TRANSLATION_SERVERS = [
+    "https://translate.argosopentech.com/translate",
+    "https://libretranslate.de/translate",
+    "https://trans.zillyhuhn.com/translate"
+]
 
-def translate_text(text, target_code, source_code="autodetect"):
+
+def translate_text(text, target_code, source_code="auto"):
     text = text.strip()
 
     if not text:
         raise ValueError("Please enter text to translate.")
 
-    if len(text.encode("utf-8")) > 500:
-        raise ValueError("Please shorten your text to 500 bytes or less.")
+    if len(text) > 5000:
+        raise ValueError("Text cannot exceed 5000 characters.")
 
     if target_code not in LANGUAGES:
         raise ValueError("Unsupported target language.")
 
-    params = {
+    if source_code == "autodetect":
+        source_code = "auto"
+
+    if source_code != "auto" and source_code not in LANGUAGES:
+        raise ValueError("Unsupported source language.")
+
+    payload = {
         "q": text,
-        "langpair": f"{source_code}|{target_code}",
-        "de": MYMEMORY_EMAIL
+        "source": source_code,
+        "target": target_code,
+        "format": "text"
     }
 
-    try:
-        response = requests.get(
-            API_URL,
-            params=params,
-            timeout=20
-        )
+    errors = []
 
-        response.raise_for_status()
-        data = response.json()
+    for server in TRANSLATION_SERVERS:
+        try:
+            response = requests.post(
+                server,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=25
+            )
 
-        if data.get("responseStatus") != 200:
-            error = data.get("responseDetails", "Translation failed.")
-            raise Exception(error)
+            response.raise_for_status()
+            data = response.json()
 
-        translated_text = data.get(
-            "responseData", {}
-        ).get("translatedText", "")
+            translated_text = data.get("translatedText")
 
-        if not translated_text:
-            raise Exception("No translation was returned.")
+            if translated_text:
+                return translated_text
 
-        return translated_text
+            errors.append(f"{server}: Empty translation response")
 
-    except requests.exceptions.RequestException as error:
-        raise Exception(f"Network error: {error}")
+        except requests.exceptions.RequestException as error:
+            errors.append(f"{server}: {error}")
+
+        except (ValueError, KeyError) as error:
+            errors.append(f"{server}: Invalid response: {error}")
+
+    raise Exception(
+        "All translation servers are currently unavailable. "
+        "Please try again later. Details: " + " | ".join(errors)
+    )
 
 
 def multilingual_translator():
@@ -87,6 +87,7 @@ def multilingual_translator():
     try:
         result = translate_text(text, target)
         print("\nTranslation:", result)
+
     except Exception as error:
         print("\nError:", error)
 
