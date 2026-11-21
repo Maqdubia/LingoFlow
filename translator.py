@@ -18,6 +18,8 @@ LANGUAGES = {
     "nl": "Dutch"
 }
 
+MYMEMORY_EMAIL = "maqdubiarahmath18@gmail.com"
+
 
 def translate_text(text, target_code):
     """Translate text using the MyMemory translation API."""
@@ -32,29 +34,28 @@ def translate_text(text, target_code):
 
     params = {
         "q": text.strip(),
-        "langpair": f"autodetect|{target_code}"
+        "langpair": f"autodetect|{target_code}",
+        "de": MYMEMORY_EMAIL
     }
 
     try:
-        response = requests.get(
-            url,
-            params=params,
-            timeout=20
-        )
-        response.raise_for_status()
+        response = requests.get(url, params=params, timeout=20)
 
+        if response.status_code == 429:
+            raise Exception(
+                "MyMemory daily translation limit has been reached. "
+                "Please wait for the quota to reset and try again."
+            )
+
+        response.raise_for_status()
         data = response.json()
 
         if data.get("responseStatus") != 200:
             raise Exception(
-                data.get(
-                    "responseDetails",
-                    "Translation service error."
-                )
+                data.get("responseDetails", "Translation service error.")
             )
 
-        translated_text = data["responseData"]["translatedText"]
-        return translated_text
+        return data["responseData"]["translatedText"]
 
     except requests.exceptions.RequestException as error:
         raise Exception(f"Network error: {error}")
@@ -92,7 +93,6 @@ def multilingual_translator():
             continue
 
         target_code, language_name = language_codes[selected]
-
         text = input("\nEnter the sentence to translate: ").strip()
 
         if not text:
